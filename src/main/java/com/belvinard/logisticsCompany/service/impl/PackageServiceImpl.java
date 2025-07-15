@@ -61,7 +61,6 @@ public class PackageServiceImpl implements PackageService {
         return pkgMapper.toResponseDto(pkg);
     }
 
-
     @Override
     @Transactional
     public PackageResponseDTO updatePackage(Long id, PackageRequestDTO pkgDTO) {
@@ -69,6 +68,10 @@ public class PackageServiceImpl implements PackageService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         String.format("Package not found with id: %d", id)
                 ));
+
+        if (existing.getStatus() == PackageStatus.DELIVERED) {
+            throw new APIException("Cannot update a package that has already been delivered");
+        }
 
         validateWeight(pkgDTO.weight());
         validateStatusTransition(existing.getStatus(), pkgDTO.status());
@@ -88,20 +91,20 @@ public class PackageServiceImpl implements PackageService {
     }
 
     private static final Map<PackageStatus, Set<PackageStatus>> ALLOWED_TRANSITIONS = Map.of(
-            PackageStatus.PENDING, EnumSet.of(PackageStatus.PROCESSING, PackageStatus.IN_TRANSIT, PackageStatus.OUT_FOR_DELIVERY, PackageStatus.DELIVERED),
-            PackageStatus.PROCESSING, EnumSet.of(PackageStatus.IN_TRANSIT, PackageStatus.OUT_FOR_DELIVERY, PackageStatus.DELIVERED),
-            PackageStatus.IN_TRANSIT, EnumSet.of(PackageStatus.OUT_FOR_DELIVERY, PackageStatus.DELIVERED),
+            PackageStatus.PENDING, EnumSet.of(PackageStatus.PROCESSING),
+            PackageStatus.PROCESSING, EnumSet.of(PackageStatus.IN_TRANSIT),
+            PackageStatus.IN_TRANSIT, EnumSet.of(PackageStatus.OUT_FOR_DELIVERY),
             PackageStatus.OUT_FOR_DELIVERY, EnumSet.of(PackageStatus.DELIVERED)
     );
 
+
     private void validateStatusTransition(PackageStatus current, PackageStatus next) {
-        if (current == PackageStatus.DELIVERED) {
-            throw new APIException("Cannot update a package that has already been delivered");
-        }
-        if (current.ordinal() > next.ordinal()) {
-            throw new APIException("Cannot move package backwards in status: from " + current + " to " + next);
+        Set<PackageStatus> allowed = ALLOWED_TRANSITIONS.getOrDefault(current, Collections.emptySet());
+        if (!allowed.contains(next)) {
+            throw new APIException("Invalid status transition: from " + current + " to " + next);
         }
     }
+
 
 
     private Pageable createPageable(PageRequest request) {
