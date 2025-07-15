@@ -80,6 +80,23 @@ public class PackageController {
         return ResponseEntity.ok(dto);
     }
 
+    @PutMapping("/{id}")
+    @Operation(summary = "Update package", description = "Update all fields of an existing package by ID (not allowed if already delivered)")
+    @ApiResponse(responseCode = "200", description = "Package updated successfully")
+    @ApiResponse(responseCode = "400", description = "Invalid parameters or cannot update delivered package")
+    @ApiResponse(responseCode = "404", description = "Package not found")
+    public ResponseEntity<PackageResponseDTO> updatePackage(
+            @Parameter(description = "ID of the package to update", example = "1")
+            @PathVariable Long id,
+            @Valid @RequestBody PackageRequestDTO pkgDTO
+    ) {
+        PackageResponseDTO response = packageService.updatePackage(id, pkgDTO);
+        return ResponseEntity.ok(response);
+    }
+
+
+
+
 
 
 }
