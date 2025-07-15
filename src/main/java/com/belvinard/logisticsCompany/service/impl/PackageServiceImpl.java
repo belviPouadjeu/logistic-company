@@ -18,8 +18,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
-import java.util.EnumSet;
-import java.util.List;
+import java.util.*;
 
 @Service
 @Transactional
@@ -62,6 +61,7 @@ public class PackageServiceImpl implements PackageService {
         return pkgMapper.toResponseDto(pkg);
     }
 
+
     @Override
     @Transactional
     public PackageResponseDTO updatePackage(Long id, PackageRequestDTO pkgDTO) {
@@ -70,12 +70,8 @@ public class PackageServiceImpl implements PackageService {
                         String.format("Package not found with id: %d", id)
                 ));
 
-        if (existing.getStatus() == PackageStatus.DELIVERED) {
-            throw new APIException("Cannot update a package that has already been delivered");
-        }
-
         validateWeight(pkgDTO.weight());
-        validateInitialStatus(pkgDTO.status());
+        validateStatusTransition(existing.getStatus(), pkgDTO.status());
 
         existing.setDescription(pkgDTO.description());
         existing.setWeight(pkgDTO.weight());
@@ -85,14 +81,22 @@ public class PackageServiceImpl implements PackageService {
         PackageEntity updated = pkgRepo.save(existing);
         return pkgMapper.toResponseDto(updated);
     }
+    
+    private static final Map<PackageStatus, Set<PackageStatus>> ALLOWED_TRANSITIONS = Map.of(
+            PackageStatus.PENDING, EnumSet.of(PackageStatus.PROCESSING, PackageStatus.IN_TRANSIT, PackageStatus.OUT_FOR_DELIVERY, PackageStatus.DELIVERED),
+            PackageStatus.PROCESSING, EnumSet.of(PackageStatus.IN_TRANSIT, PackageStatus.OUT_FOR_DELIVERY, PackageStatus.DELIVERED),
+            PackageStatus.IN_TRANSIT, EnumSet.of(PackageStatus.OUT_FOR_DELIVERY, PackageStatus.DELIVERED),
+            PackageStatus.OUT_FOR_DELIVERY, EnumSet.of(PackageStatus.DELIVERED)
+    );
 
-    private void validateInitialStatus(PackageStatus status) {
-        var validInitialStatuses = EnumSet.of(PackageStatus.PENDING);
-        if (!validInitialStatuses.contains(status)) {
-            throw new APIException("Status must be an initial state (e.g. PENDING)");
+    private void validateStatusTransition(PackageStatus current, PackageStatus next) {
+        if (current == PackageStatus.DELIVERED) {
+            throw new APIException("Cannot update a package that has already been delivered");
+        }
+        if (current.ordinal() > next.ordinal()) {
+            throw new APIException("Cannot move package backwards in status: from " + current + " to " + next);
         }
     }
-
 
 
     private Pageable createPageable(PageRequest request) {
