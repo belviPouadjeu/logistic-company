@@ -2,12 +2,18 @@ package com.belvinard.logisticsCompany.service;
 
 import com.belvinard.logisticsCompany.payload.PackageRequestDTO;
 import com.belvinard.logisticsCompany.payload.PackageResponseDTO;
+import com.belvinard.logisticsCompany.payload.PackageResponse;
 import com.belvinard.logisticsCompany.model.PackageEntity;
 import com.belvinard.logisticsCompany.model.PackageStatus;
 import com.belvinard.logisticsCompany.exceptions.APIException;
 import com.belvinard.logisticsCompany.mapper.PackageMapper;
 import com.belvinard.logisticsCompany.repository.PackageRepository;
 import com.belvinard.logisticsCompany.service.impl.PackageServiceImpl;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -100,5 +106,182 @@ class PackageServiceImplTest {
             .hasMessageContaining("Status must be an initial state");
 
         verifyNoInteractions(pkgRepo, pkgMapper);
+    }
+
+    @Test
+    void getAllPackages_withDefaultParameters_success() {
+        // Given
+        List<PackageEntity> entities = createTestEntities();
+        Page<PackageEntity> page = new PageImpl<>(entities, 
+            org.springframework.data.domain.PageRequest.of(0, 5), 10);
+        
+        List<PackageResponseDTO> responseDTOs = createTestResponseDTOs();
+        
+        when(pkgRepo.findAll(any(Pageable.class))).thenReturn(page);
+        when(pkgMapper.toResponseDto(any(PackageEntity.class)))
+            .thenReturn(responseDTOs.get(0), responseDTOs.get(1));
+
+        // When
+        PackageResponse result = service.getAllPackages(null, null, null, null);
+
+        // Then
+        assertThat(result).isNotNull();
+        assertThat(result.getContent()).hasSize(2);
+        assertThat(result.getPageNumber()).isEqualTo(0);
+        assertThat(result.getPageSize()).isEqualTo(5);
+        assertThat(result.getTotalElements()).isEqualTo(10);
+        assertThat(result.getTotalPages()).isEqualTo(2);
+        assertThat(result.isLastPage()).isFalse();
+        
+        verify(pkgRepo).findAll(any(Pageable.class));
+        verify(pkgMapper, times(2)).toResponseDto(any(PackageEntity.class));
+    }
+
+    @Test
+    void getAllPackages_withCustomParameters_success() {
+        // Given
+        List<PackageEntity> entities = createTestEntities();
+        Page<PackageEntity> page = new PageImpl<>(entities, 
+            org.springframework.data.domain.PageRequest.of(1, 3), 6);
+        
+        List<PackageResponseDTO> responseDTOs = createTestResponseDTOs();
+        
+        when(pkgRepo.findAll(any(Pageable.class))).thenReturn(page);
+        when(pkgMapper.toResponseDto(any(PackageEntity.class)))
+            .thenReturn(responseDTOs.get(0), responseDTOs.get(1));
+
+        // When
+        PackageResponse result = service.getAllPackages(1, 3, "description", "desc");
+
+        // Then
+        assertThat(result).isNotNull();
+        assertThat(result.getContent()).hasSize(2);
+        assertThat(result.getPageNumber()).isEqualTo(1);
+        assertThat(result.getPageSize()).isEqualTo(3);
+        assertThat(result.getTotalElements()).isEqualTo(6);
+        assertThat(result.getTotalPages()).isEqualTo(2);
+        assertThat(result.isLastPage()).isTrue();
+        
+        verify(pkgRepo).findAll(any(Pageable.class));
+    }
+
+    @Test
+    void getAllPackages_emptyResult_success() {
+        // Given
+        Page<PackageEntity> emptyPage = new PageImpl<>(List.of(), 
+            org.springframework.data.domain.PageRequest.of(0, 5), 0);
+        
+        when(pkgRepo.findAll(any(Pageable.class))).thenReturn(emptyPage);
+
+        // When
+        PackageResponse result = service.getAllPackages(0, 5, "packageId", "asc");
+
+        // Then
+        assertThat(result).isNotNull();
+        assertThat(result.getContent()).isEmpty();
+        assertThat(result.getPageNumber()).isEqualTo(0);
+        assertThat(result.getPageSize()).isEqualTo(5);
+        assertThat(result.getTotalElements()).isEqualTo(0);
+        assertThat(result.getTotalPages()).isEqualTo(0);
+        assertThat(result.isLastPage()).isTrue();
+        
+        verify(pkgRepo).findAll(any(Pageable.class));
+        verifyNoInteractions(pkgMapper);
+    }
+
+    @Test
+    void getAllPackages_invalidSortDirection_throwsException() {
+        // When & Then
+        assertThatThrownBy(() -> service.getAllPackages(0, 5, "packageId", "invalid"))
+            .isInstanceOf(APIException.class)
+            .hasMessageContaining("Invalid sort direction: invalid");
+        
+        verifyNoInteractions(pkgRepo, pkgMapper);
+    }
+
+    @Test
+    void getAllPackages_negativePageNumber_usesDefault() {
+        // Given
+        List<PackageEntity> entities = createTestEntities();
+        Page<PackageEntity> page = new PageImpl<>(entities, 
+            org.springframework.data.domain.PageRequest.of(0, 5), 2);
+        
+        List<PackageResponseDTO> responseDTOs = createTestResponseDTOs();
+        
+        when(pkgRepo.findAll(any(Pageable.class))).thenReturn(page);
+        when(pkgMapper.toResponseDto(any(PackageEntity.class)))
+            .thenReturn(responseDTOs.get(0), responseDTOs.get(1));
+
+        // When
+        PackageResponse result = service.getAllPackages(-1, null, null, null);
+
+        // Then
+        assertThat(result.getPageNumber()).isEqualTo(0); // Should use default
+        verify(pkgRepo).findAll(any(Pageable.class));
+    }
+
+    @Test
+    void getAllPackages_zeroPageSize_usesDefault() {
+        // Given
+        List<PackageEntity> entities = createTestEntities();
+        Page<PackageEntity> page = new PageImpl<>(entities, 
+            org.springframework.data.domain.PageRequest.of(0, 5), 2);
+        
+        List<PackageResponseDTO> responseDTOs = createTestResponseDTOs();
+        
+        when(pkgRepo.findAll(any(Pageable.class))).thenReturn(page);
+        when(pkgMapper.toResponseDto(any(PackageEntity.class)))
+            .thenReturn(responseDTOs.get(0), responseDTOs.get(1));
+
+        // When
+        PackageResponse result = service.getAllPackages(null, 0, null, null);
+
+        // Then
+        assertThat(result.getPageSize()).isEqualTo(5); // Should use default
+        verify(pkgRepo).findAll(any(Pageable.class));
+    }
+
+    @Test
+    void getAllPackages_blankSortBy_usesDefault() {
+        // Given
+        List<PackageEntity> entities = createTestEntities();
+        Page<PackageEntity> page = new PageImpl<>(entities, 
+            org.springframework.data.domain.PageRequest.of(0, 5), 2);
+        
+        List<PackageResponseDTO> responseDTOs = createTestResponseDTOs();
+        
+        when(pkgRepo.findAll(any(Pageable.class))).thenReturn(page);
+        when(pkgMapper.toResponseDto(any(PackageEntity.class)))
+            .thenReturn(responseDTOs.get(0), responseDTOs.get(1));
+
+        // When
+        service.getAllPackages(null, null, "  ", null);
+
+        // Then - Verify that the default sort field is used (packageId)
+        verify(pkgRepo).findAll(any(Pageable.class));
+    }
+
+    private List<PackageEntity> createTestEntities() {
+        PackageEntity entity1 = new PackageEntity();
+        entity1.setPackageId(1L);
+        entity1.setDescription("Package 1");
+        entity1.setWeight(10.0);
+        entity1.setFragile(false);
+        entity1.setStatus(PackageStatus.PENDING);
+
+        PackageEntity entity2 = new PackageEntity();
+        entity2.setPackageId(2L);
+        entity2.setDescription("Package 2");
+        entity2.setWeight(15.0);
+        entity2.setFragile(true);
+        entity2.setStatus(PackageStatus.IN_TRANSIT);
+
+        return List.of(entity1, entity2);
+    }
+
+    private List<PackageResponseDTO> createTestResponseDTOs() {
+        PackageResponseDTO dto1 = new PackageResponseDTO(1L, "Package 1", 10.0, false, PackageStatus.PENDING);
+        PackageResponseDTO dto2 = new PackageResponseDTO(2L, "Package 2", 15.0, true, PackageStatus.IN_TRANSIT);
+        return List.of(dto1, dto2);
     }
 }
