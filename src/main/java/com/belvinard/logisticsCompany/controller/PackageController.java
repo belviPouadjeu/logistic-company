@@ -47,7 +47,7 @@ public class PackageController {
     )
     @ApiResponse(responseCode = "200", description = "Success")
     @ApiResponse(responseCode = "400", description = "Invalid parameters")
-    @GetMapping
+    @GetMapping("/all")
     public ResponseEntity<PackageResponse> getAllPackages(
             @Parameter(description = "Page number (0-based)", example = "0")
             @RequestParam(value = "pageNumber", required = false) Integer pageNumber,
@@ -67,6 +67,19 @@ public class PackageController {
         );
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
+
+    @GetMapping("/{id}")
+    @Operation(summary = "Get package by ID", description = "Retrieve a single package by its ID")
+    @ApiResponse(responseCode = "200", description = "Found the package")
+    @ApiResponse(responseCode = "404", description = "Package not found")
+    public ResponseEntity<PackageResponseDTO> getPackageById(
+            @Parameter(description = "ID of the package to retrieve", required = true, example = "1")
+            @PathVariable Long id
+    ) {
+        PackageResponseDTO dto = packageService.getPackageById(id);
+        return ResponseEntity.ok(dto);
+    }
+
 
 
 }
