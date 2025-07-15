@@ -371,7 +371,7 @@ class PackageServiceImplTest {
         // Given
         Long packageId = 1L;
         PackageRequestDTO updateRequest = new PackageRequestDTO(
-                "Updated Package Description", 25.0, true, PackageStatus.PENDING
+                "Updated Package Description", 25.0, true, PackageStatus.PROCESSING
         );
 
         PackageEntity existingEntity = new PackageEntity();
@@ -386,10 +386,10 @@ class PackageServiceImplTest {
         updatedEntity.setDescription("Updated Package Description");
         updatedEntity.setWeight(25.0);
         updatedEntity.setFragile(true);
-        updatedEntity.setStatus(PackageStatus.PENDING);
+        updatedEntity.setStatus(PackageStatus.PROCESSING);
 
         PackageResponseDTO expectedResponse = new PackageResponseDTO(
-                packageId, "Updated Package Description", 25.0, true, PackageStatus.PENDING
+                packageId, "Updated Package Description", 25.0, true, PackageStatus.PROCESSING
         );
 
         when(pkgRepo.findById(packageId)).thenReturn(Optional.of(existingEntity));
@@ -405,13 +405,13 @@ class PackageServiceImplTest {
         assertThat(result.description()).isEqualTo("Updated Package Description");
         assertThat(result.weight()).isEqualTo(25.0);
         assertThat(result.fragile()).isTrue();
-        assertThat(result.status()).isEqualTo(PackageStatus.PENDING);
+        assertThat(result.status()).isEqualTo(PackageStatus.PROCESSING);
 
         // Verify entity was updated
         assertThat(existingEntity.getDescription()).isEqualTo("Updated Package Description");
         assertThat(existingEntity.getWeight()).isEqualTo(25.0);
         assertThat(existingEntity.getFragile()).isTrue();
-        assertThat(existingEntity.getStatus()).isEqualTo(PackageStatus.PENDING);
+        assertThat(existingEntity.getStatus()).isEqualTo(PackageStatus.PROCESSING);
 
         verify(pkgRepo).findById(packageId);
         verify(pkgRepo).save(existingEntity);
@@ -512,7 +512,7 @@ class PackageServiceImplTest {
         // When & Then
         assertThatThrownBy(() -> service.updatePackage(packageId, updateRequest))
                 .isInstanceOf(APIException.class)
-                .hasMessage("Status must be an initial state (e.g. PENDING)");
+                .hasMessage("Invalid status transition: from PENDING to DELIVERED");
 
         verify(pkgRepo).findById(packageId);
         verify(pkgRepo, never()).save(any());
@@ -524,7 +524,7 @@ class PackageServiceImplTest {
         // Given
         Long packageId = 1L;
         PackageRequestDTO updateRequest = new PackageRequestDTO(
-                "Updated Description", 20.0, true, PackageStatus.PENDING
+                "Updated Description", 20.0, true, PackageStatus.OUT_FOR_DELIVERY
         );
 
         PackageEntity existingEntity = new PackageEntity();
@@ -539,10 +539,10 @@ class PackageServiceImplTest {
         updatedEntity.setDescription("Updated Description");
         updatedEntity.setWeight(20.0);
         updatedEntity.setFragile(true);
-        updatedEntity.setStatus(PackageStatus.PENDING);
+        updatedEntity.setStatus(PackageStatus.OUT_FOR_DELIVERY);
 
         PackageResponseDTO expectedResponse = new PackageResponseDTO(
-                packageId, "Updated Description", 20.0, true, PackageStatus.PENDING
+                packageId, "Updated Description", 20.0, true, PackageStatus.OUT_FOR_DELIVERY
         );
 
         when(pkgRepo.findById(packageId)).thenReturn(Optional.of(existingEntity));
@@ -557,7 +557,7 @@ class PackageServiceImplTest {
         assertThat(result.description()).isEqualTo("Updated Description");
         assertThat(result.weight()).isEqualTo(20.0);
         assertThat(result.fragile()).isTrue();
-        assertThat(result.status()).isEqualTo(PackageStatus.PENDING);
+        assertThat(result.status()).isEqualTo(PackageStatus.OUT_FOR_DELIVERY);
 
         verify(pkgRepo).findById(packageId);
         verify(pkgRepo).save(existingEntity);
@@ -590,7 +590,7 @@ class PackageServiceImplTest {
         // Given
         Long packageId = 1L;
         PackageRequestDTO updateRequest = new PackageRequestDTO(
-                "Updated Description", 20.0, false, PackageStatus.PENDING
+                "Updated Description", 20.0, false, PackageStatus.PROCESSING
         );
 
         PackageEntity existingEntity = new PackageEntity();
