@@ -18,8 +18,8 @@ import jakarta.validation.constraints.Size;
  * @param status The current status of the package.
  */
 public record PackageRequestDTO(
-    @NotBlank @Size(min = 4) String description,
-    @NotNull @Positive Double weight,
-    @NotNull Boolean fragile,
-    @NotNull PackageStatus status
+        @NotBlank @Size(min = 4, max = 255) String description,
+        @NotNull @Positive Double weight,
+        @NotNull Boolean fragile,
+        @NotNull PackageStatus status
 ) {}
