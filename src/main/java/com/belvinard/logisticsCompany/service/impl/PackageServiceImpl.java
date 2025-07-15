@@ -2,6 +2,7 @@ package com.belvinard.logisticsCompany.service.impl;
 
 import com.belvinard.logisticsCompany.exceptions.APIException;
 import com.belvinard.logisticsCompany.mapper.PackageMapper;
+import com.belvinard.logisticsCompany.model.PackageEntity;
 import com.belvinard.logisticsCompany.model.PackageStatus;
 import com.belvinard.logisticsCompany.payload.PackageRequestDTO;
 import com.belvinard.logisticsCompany.payload.PackageResponseDTO;
@@ -26,10 +27,11 @@ public class PackageServiceImpl implements PackageService {
         validateWeight(request.weight());
         validateInitialStatus(request.status());
 
-        Package pkg = pkgMapper.toEntity(request);
-        Package saved = pkgRepo.save(pkg);
-        return pkgMapper.toResponseDto(saved);
+        PackageEntity pkgEntity = pkgMapper.toEntity(request);
+        PackageEntity savedEntity = pkgRepo.save(pkgEntity);
+        return pkgMapper.toResponseDto(savedEntity);
     }
+
 
     private void validateWeight(Double weight) {
         double maxWeight = 50.0;
@@ -41,15 +43,12 @@ public class PackageServiceImpl implements PackageService {
     }
 
     private void validateInitialStatus(PackageStatus status) {
-        var invalid = EnumSet.of(
-                PackageStatus.DELIVERED,
-                PackageStatus.RETURNED,
-                PackageStatus.FAILED_DELIVERY
-        );
-        if (invalid.contains(status)) {
+        var validInitialStatuses = EnumSet.of(PackageStatus.PENDING);
+        if (!validInitialStatuses.contains(status)) {
             throw new APIException("Status must be an initial state (e.g. PENDING)");
         }
     }
+
 
 
 
