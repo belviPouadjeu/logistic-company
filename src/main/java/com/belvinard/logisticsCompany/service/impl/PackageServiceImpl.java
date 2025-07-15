@@ -18,6 +18,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
+import java.util.EnumSet;
 import java.util.List;
 
 @Service
@@ -60,6 +61,38 @@ public class PackageServiceImpl implements PackageService {
                 ));
         return pkgMapper.toResponseDto(pkg);
     }
+
+    @Override
+    @Transactional
+    public PackageResponseDTO updatePackage(Long id, PackageRequestDTO pkgDTO) {
+        PackageEntity existing = pkgRepo.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        String.format("Package not found with id: %d", id)
+                ));
+
+        if (existing.getStatus() == PackageStatus.DELIVERED) {
+            throw new APIException("Cannot update a package that has already been delivered");
+        }
+
+        validateWeight(pkgDTO.weight());
+        validateInitialStatus(pkgDTO.status());
+
+        existing.setDescription(pkgDTO.description());
+        existing.setWeight(pkgDTO.weight());
+        existing.setFragile(pkgDTO.fragile());
+        existing.setStatus(pkgDTO.status());
+
+        PackageEntity updated = pkgRepo.save(existing);
+        return pkgMapper.toResponseDto(updated);
+    }
+
+    private void validateInitialStatus(PackageStatus status) {
+        var validInitialStatuses = EnumSet.of(PackageStatus.PENDING);
+        if (!validInitialStatuses.contains(status)) {
+            throw new APIException("Status must be an initial state (e.g. PENDING)");
+        }
+    }
+
 
 
     private Pageable createPageable(PageRequest request) {

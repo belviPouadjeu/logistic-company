@@ -11,4 +11,6 @@ public interface PackageService {
 
     PackageResponseDTO getPackageById(Long id);
 
+    PackageResponseDTO updatePackage(Long id, PackageRequestDTO pkgDTO);
+
 }
