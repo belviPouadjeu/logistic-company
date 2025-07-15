@@ -81,7 +81,12 @@ public class PackageServiceImpl implements PackageService {
         PackageEntity updated = pkgRepo.save(existing);
         return pkgMapper.toResponseDto(updated);
     }
-    
+
+    @Override
+    public PackageResponseDTO deletePackage(Long id) {
+        return null;
+    }
+
     private static final Map<PackageStatus, Set<PackageStatus>> ALLOWED_TRANSITIONS = Map.of(
             PackageStatus.PENDING, EnumSet.of(PackageStatus.PROCESSING, PackageStatus.IN_TRANSIT, PackageStatus.OUT_FOR_DELIVERY, PackageStatus.DELIVERED),
             PackageStatus.PROCESSING, EnumSet.of(PackageStatus.IN_TRANSIT, PackageStatus.OUT_FOR_DELIVERY, PackageStatus.DELIVERED),

@@ -13,4 +13,6 @@ public interface PackageService {
 
     PackageResponseDTO updatePackage(Long id, PackageRequestDTO pkgDTO);
 
+    PackageResponseDTO deletePackage(Long id);
+
 }
