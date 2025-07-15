@@ -6,6 +6,7 @@ import com.belvinard.logisticsCompany.payload.PackageResponse;
 import com.belvinard.logisticsCompany.model.PackageEntity;
 import com.belvinard.logisticsCompany.model.PackageStatus;
 import com.belvinard.logisticsCompany.exceptions.APIException;
+import com.belvinard.logisticsCompany.exceptions.ResourceNotFoundException;
 import com.belvinard.logisticsCompany.mapper.PackageMapper;
 import com.belvinard.logisticsCompany.repository.PackageRepository;
 import com.belvinard.logisticsCompany.service.impl.PackageServiceImpl;
@@ -14,6 +15,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -259,6 +261,109 @@ class PackageServiceImplTest {
 
         // Then - Verify that the default sort field is used (packageId)
         verify(pkgRepo).findAll(any(Pageable.class));
+    }
+
+    @Test
+    void getPackageById_existingId_success() {
+        // Given
+        Long packageId = 1L;
+        PackageEntity packageEntity = new PackageEntity();
+        packageEntity.setPackageId(packageId);
+        packageEntity.setDescription("Test Package");
+        packageEntity.setWeight(15.0);
+        packageEntity.setFragile(true);
+        packageEntity.setStatus(PackageStatus.PENDING);
+
+        PackageResponseDTO expectedResponse = new PackageResponseDTO(
+                packageId, "Test Package", 15.0, true, PackageStatus.PENDING
+        );
+
+        when(pkgRepo.findById(packageId)).thenReturn(Optional.of(packageEntity));
+        when(pkgMapper.toResponseDto(packageEntity)).thenReturn(expectedResponse);
+
+        // When
+        PackageResponseDTO result = service.getPackageById(packageId);
+
+        // Then
+        assertThat(result).isNotNull();
+        assertThat(result.packageId()).isEqualTo(packageId);
+        assertThat(result.description()).isEqualTo("Test Package");
+        assertThat(result.weight()).isEqualTo(15.0);
+        assertThat(result.fragile()).isTrue();
+        assertThat(result.status()).isEqualTo(PackageStatus.PENDING);
+
+        verify(pkgRepo).findById(packageId);
+        verify(pkgMapper).toResponseDto(packageEntity);
+    }
+
+    @Test
+    void getPackageById_nonExistingId_throwsResourceNotFoundException() {
+        // Given
+        Long nonExistingId = 999L;
+        when(pkgRepo.findById(nonExistingId)).thenReturn(Optional.empty());
+
+        // When & Then
+        assertThatThrownBy(() -> service.getPackageById(nonExistingId))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Package not found with id: 999");
+
+        verify(pkgRepo).findById(nonExistingId);
+        verifyNoInteractions(pkgMapper);
+    }
+
+    @Test
+    void getPackageById_nullId_throwsResourceNotFoundException() {
+        // Given
+        Long nullId = null;
+        when(pkgRepo.findById(nullId)).thenReturn(Optional.empty());
+
+        // When & Then
+        assertThatThrownBy(() -> service.getPackageById(nullId))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Package not found with id: null");
+
+        verify(pkgRepo).findById(nullId);
+        verifyNoInteractions(pkgMapper);
+    }
+
+    @Test
+    void getPackageById_repositoryThrowsException_propagatesException() {
+        // Given
+        Long packageId = 1L;
+        RuntimeException repositoryException = new RuntimeException("Database connection error");
+        when(pkgRepo.findById(packageId)).thenThrow(repositoryException);
+
+        // When & Then
+        assertThatThrownBy(() -> service.getPackageById(packageId))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessage("Database connection error");
+
+        verify(pkgRepo).findById(packageId);
+        verifyNoInteractions(pkgMapper);
+    }
+
+    @Test
+    void getPackageById_mapperReturnsNull_returnsNull() {
+        // Given
+        Long packageId = 1L;
+        PackageEntity packageEntity = new PackageEntity();
+        packageEntity.setPackageId(packageId);
+        packageEntity.setDescription("Test Package");
+        packageEntity.setWeight(10.0);
+        packageEntity.setFragile(false);
+        packageEntity.setStatus(PackageStatus.PENDING);
+
+        when(pkgRepo.findById(packageId)).thenReturn(Optional.of(packageEntity));
+        when(pkgMapper.toResponseDto(packageEntity)).thenReturn(null);
+
+        // When
+        PackageResponseDTO result = service.getPackageById(packageId);
+
+        // Then
+        assertThat(result).isNull();
+
+        verify(pkgRepo).findById(packageId);
+        verify(pkgMapper).toResponseDto(packageEntity);
     }
 
     private List<PackageEntity> createTestEntities() {
