@@ -97,15 +97,12 @@ public class PackageServiceImpl implements PackageService {
             PackageStatus.OUT_FOR_DELIVERY, EnumSet.of(PackageStatus.DELIVERED)
     );
 
-
     private void validateStatusTransition(PackageStatus current, PackageStatus next) {
         Set<PackageStatus> allowed = ALLOWED_TRANSITIONS.getOrDefault(current, Collections.emptySet());
         if (!allowed.contains(next)) {
             throw new APIException("Invalid status transition: from " + current + " to " + next);
         }
     }
-
-
 
     private Pageable createPageable(PageRequest request) {
         int page = getValidPage(request.pageNumber());
