@@ -1,18 +1,25 @@
 package com.belvinard.logisticsCompany.service.impl;
 
+import com.belvinard.logisticsCompany.config.AppConstant;
 import com.belvinard.logisticsCompany.exceptions.APIException;
 import com.belvinard.logisticsCompany.mapper.PackageMapper;
 import com.belvinard.logisticsCompany.model.PackageEntity;
 import com.belvinard.logisticsCompany.model.PackageStatus;
 import com.belvinard.logisticsCompany.payload.PackageRequestDTO;
+import com.belvinard.logisticsCompany.payload.PackageResponse;
 import com.belvinard.logisticsCompany.payload.PackageResponseDTO;
 import com.belvinard.logisticsCompany.repository.PackageRepository;
 import com.belvinard.logisticsCompany.service.PackageService;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.util.EnumSet;
+import java.util.List;
 
 @Service
 @Transactional
@@ -24,30 +31,91 @@ public class PackageServiceImpl implements PackageService {
 
     @Override
     public PackageResponseDTO createPackage(PackageRequestDTO request) {
-        validateWeight(request.weight());
-        validateInitialStatus(request.status());
-
+        validatePackageRequest(request);
         PackageEntity pkgEntity = pkgMapper.toEntity(request);
         PackageEntity savedEntity = pkgRepo.save(pkgEntity);
         return pkgMapper.toResponseDto(savedEntity);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public PackageResponse getAllPackages(Integer pageNumber, Integer pageSize,
+                                          String sortBy, String sortOrder) {
+        PageRequest pageRequest = new PageRequest(pageNumber, pageSize, sortBy, sortOrder);
+        Pageable pageable = createPageable(pageRequest);
+        Page<PackageEntity> pageResult = pkgRepo.findAll(pageable);
+        
+        List<PackageResponseDTO> content = pageResult.getContent().stream()
+                .map(pkgMapper::toResponseDto)
+                .toList();
 
-    private void validateWeight(Double weight) {
-        double maxWeight = 50.0;
-        if (weight > maxWeight) {
-            throw new APIException(
-                    String.format("Weight must not exceed %.1f kg", maxWeight)
-            );
+        return buildPackageResponse(pageResult, content);
+    }
+
+    private Pageable createPageable(PageRequest request) {
+        int page = getValidPage(request.pageNumber());
+        int size = getValidSize(request.pageSize());
+        String field = getValidSortField(request.sortBy());
+        Sort.Direction direction = getSortDirection(request.sortOrder());
+        
+        return org.springframework.data.domain.PageRequest.of(page, size, Sort.by(direction, field));
+    }
+
+    private int getValidPage(Integer pageNumber) {
+        return pageNumber != null && pageNumber >= 0 ? pageNumber : Integer.parseInt(AppConstant.PAGE_NUMBER);
+    }
+
+    private int getValidSize(Integer pageSize) {
+        return pageSize != null && pageSize > 0 ? pageSize : Integer.parseInt(AppConstant.PAGE_SIZE);
+    }
+
+    private String getValidSortField(String sortBy) {
+        return sortBy != null && !sortBy.isBlank() ? sortBy : AppConstant.SORT_PACKAGE_BY;
+    }
+
+    private Sort.Direction getSortDirection(String sortOrder) {
+        String dir = getValidSortOrder(sortOrder);
+        try {
+            return Sort.Direction.fromString(dir);
+        } catch (IllegalArgumentException e) {
+            throw new APIException("Invalid sort direction: " + dir);
         }
     }
 
-    private void validateInitialStatus(PackageStatus status) {
-        var validInitialStatuses = EnumSet.of(PackageStatus.PENDING);
-        if (!validInitialStatuses.contains(status)) {
-            throw new APIException("Status must be an initial state (e.g. PENDING)");
+    private String getValidSortOrder(String sortOrder) {
+        return sortOrder != null && !sortOrder.isBlank() ? sortOrder : AppConstant.SORT_DIR;
+    }
+
+    private PackageResponse buildPackageResponse(Page<PackageEntity> pageResult, List<PackageResponseDTO> content) {
+        return new PackageResponse(
+                content,
+                pageResult.getNumber(),
+                pageResult.getSize(),
+                pageResult.getTotalElements(),
+                pageResult.getTotalPages(),
+                pageResult.isLast()
+        );
+    }
+
+
+    private void validatePackageRequest(PackageRequestDTO request) {
+        validateWeight(request.weight());
+        validateStatus(request.status());
+    }
+
+    private void validateWeight(double weight) {
+        if (weight > 50.0) {
+            throw new APIException("Weight must not exceed 50.0 kg");
         }
     }
+
+    private void validateStatus(PackageStatus status) {
+        if (status != PackageStatus.PENDING) {
+            throw new APIException("Status must be PENDING for new packages");
+        }
+    }
+
+    public record PageRequest(Integer pageNumber, Integer pageSize, String sortBy, String sortOrder) {}
 
 
 
