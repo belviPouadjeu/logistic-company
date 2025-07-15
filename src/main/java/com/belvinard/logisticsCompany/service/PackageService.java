@@ -9,4 +9,6 @@ public interface PackageService {
     PackageResponseDTO createPackage(PackageRequestDTO request);
     PackageResponse getAllPackages(Integer pageNumber, Integer pageSize, String sortBy, String sortOrder);
 
+    PackageResponseDTO getPackageById(Long id);
+
 }

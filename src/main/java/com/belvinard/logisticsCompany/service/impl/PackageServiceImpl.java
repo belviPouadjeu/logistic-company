@@ -2,6 +2,7 @@ package com.belvinard.logisticsCompany.service.impl;
 
 import com.belvinard.logisticsCompany.config.AppConstant;
 import com.belvinard.logisticsCompany.exceptions.APIException;
+import com.belvinard.logisticsCompany.exceptions.ResourceNotFoundException;
 import com.belvinard.logisticsCompany.mapper.PackageMapper;
 import com.belvinard.logisticsCompany.model.PackageEntity;
 import com.belvinard.logisticsCompany.model.PackageStatus;
@@ -49,6 +50,17 @@ public class PackageServiceImpl implements PackageService {
 
         return buildPackageResponse(pageResult, content);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PackageResponseDTO getPackageById(Long id) {
+        PackageEntity pkg = pkgRepo.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        String.format("Package not found with id: %d", id)
+                ));
+        return pkgMapper.toResponseDto(pkg);
+    }
+
 
     private Pageable createPageable(PageRequest request) {
         int page = getValidPage(request.pageNumber());
