@@ -13,12 +13,10 @@ import com.belvinard.logisticsCompany.service.PackageService;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
-import java.util.EnumSet;
 import java.util.List;
 
 @Service
@@ -111,7 +109,7 @@ public class PackageServiceImpl implements PackageService {
 
     private void validateStatus(PackageStatus status) {
         if (status != PackageStatus.PENDING) {
-            throw new APIException("Status must be PENDING for new packages");
+            throw new APIException("Status must be an initial state (e.g. PENDING)");
         }
     }
 
