@@ -366,6 +366,254 @@ class PackageServiceImplTest {
         verify(pkgMapper).toResponseDto(packageEntity);
     }
 
+    @Test
+    void updatePackage_validUpdate_success() {
+        // Given
+        Long packageId = 1L;
+        PackageRequestDTO updateRequest = new PackageRequestDTO(
+                "Updated Package Description", 25.0, true, PackageStatus.PENDING
+        );
+
+        PackageEntity existingEntity = new PackageEntity();
+        existingEntity.setPackageId(packageId);
+        existingEntity.setDescription("Original Description");
+        existingEntity.setWeight(15.0);
+        existingEntity.setFragile(false);
+        existingEntity.setStatus(PackageStatus.PENDING);
+
+        PackageEntity updatedEntity = new PackageEntity();
+        updatedEntity.setPackageId(packageId);
+        updatedEntity.setDescription("Updated Package Description");
+        updatedEntity.setWeight(25.0);
+        updatedEntity.setFragile(true);
+        updatedEntity.setStatus(PackageStatus.PENDING);
+
+        PackageResponseDTO expectedResponse = new PackageResponseDTO(
+                packageId, "Updated Package Description", 25.0, true, PackageStatus.PENDING
+        );
+
+        when(pkgRepo.findById(packageId)).thenReturn(Optional.of(existingEntity));
+        when(pkgRepo.save(existingEntity)).thenReturn(updatedEntity);
+        when(pkgMapper.toResponseDto(updatedEntity)).thenReturn(expectedResponse);
+
+        // When
+        PackageResponseDTO result = service.updatePackage(packageId, updateRequest);
+
+        // Then
+        assertThat(result).isNotNull();
+        assertThat(result.packageId()).isEqualTo(packageId);
+        assertThat(result.description()).isEqualTo("Updated Package Description");
+        assertThat(result.weight()).isEqualTo(25.0);
+        assertThat(result.fragile()).isTrue();
+        assertThat(result.status()).isEqualTo(PackageStatus.PENDING);
+
+        // Verify entity was updated
+        assertThat(existingEntity.getDescription()).isEqualTo("Updated Package Description");
+        assertThat(existingEntity.getWeight()).isEqualTo(25.0);
+        assertThat(existingEntity.getFragile()).isTrue();
+        assertThat(existingEntity.getStatus()).isEqualTo(PackageStatus.PENDING);
+
+        verify(pkgRepo).findById(packageId);
+        verify(pkgRepo).save(existingEntity);
+        verify(pkgMapper).toResponseDto(updatedEntity);
+    }
+
+    @Test
+    void updatePackage_nonExistingId_throwsResourceNotFoundException() {
+        // Given
+        Long nonExistingId = 999L;
+        PackageRequestDTO updateRequest = new PackageRequestDTO(
+                "Updated Description", 20.0, false, PackageStatus.PENDING
+        );
+
+        when(pkgRepo.findById(nonExistingId)).thenReturn(Optional.empty());
+
+        // When & Then
+        assertThatThrownBy(() -> service.updatePackage(nonExistingId, updateRequest))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Package not found with id: 999");
+
+        verify(pkgRepo).findById(nonExistingId);
+        verify(pkgRepo, never()).save(any());
+        verifyNoInteractions(pkgMapper);
+    }
+
+    @Test
+    void updatePackage_deliveredPackage_throwsAPIException() {
+        // Given
+        Long packageId = 1L;
+        PackageRequestDTO updateRequest = new PackageRequestDTO(
+                "Updated Description", 20.0, false, PackageStatus.PENDING
+        );
+
+        PackageEntity deliveredEntity = new PackageEntity();
+        deliveredEntity.setPackageId(packageId);
+        deliveredEntity.setDescription("Delivered Package");
+        deliveredEntity.setWeight(15.0);
+        deliveredEntity.setFragile(false);
+        deliveredEntity.setStatus(PackageStatus.DELIVERED);
+
+        when(pkgRepo.findById(packageId)).thenReturn(Optional.of(deliveredEntity));
+
+        // When & Then
+        assertThatThrownBy(() -> service.updatePackage(packageId, updateRequest))
+                .isInstanceOf(APIException.class)
+                .hasMessage("Cannot update a package that has already been delivered");
+
+        verify(pkgRepo).findById(packageId);
+        verify(pkgRepo, never()).save(any());
+        verifyNoInteractions(pkgMapper);
+    }
+
+    @Test
+    void updatePackage_weightExceedsLimit_throwsAPIException() {
+        // Given
+        Long packageId = 1L;
+        PackageRequestDTO updateRequest = new PackageRequestDTO(
+                "Updated Description", 55.0, false, PackageStatus.PENDING // Weight > 50.0
+        );
+
+        PackageEntity existingEntity = new PackageEntity();
+        existingEntity.setPackageId(packageId);
+        existingEntity.setDescription("Original Description");
+        existingEntity.setWeight(15.0);
+        existingEntity.setFragile(false);
+        existingEntity.setStatus(PackageStatus.PENDING);
+
+        when(pkgRepo.findById(packageId)).thenReturn(Optional.of(existingEntity));
+
+        // When & Then
+        assertThatThrownBy(() -> service.updatePackage(packageId, updateRequest))
+                .isInstanceOf(APIException.class)
+                .hasMessage("Weight must not exceed 50.0 kg");
+
+        verify(pkgRepo).findById(packageId);
+        verify(pkgRepo, never()).save(any());
+        verifyNoInteractions(pkgMapper);
+    }
+
+    @Test
+    void updatePackage_invalidStatus_throwsAPIException() {
+        // Given
+        Long packageId = 1L;
+        PackageRequestDTO updateRequest = new PackageRequestDTO(
+                "Updated Description", 20.0, false, PackageStatus.DELIVERED // Invalid status for update
+        );
+
+        PackageEntity existingEntity = new PackageEntity();
+        existingEntity.setPackageId(packageId);
+        existingEntity.setDescription("Original Description");
+        existingEntity.setWeight(15.0);
+        existingEntity.setFragile(false);
+        existingEntity.setStatus(PackageStatus.PENDING);
+
+        when(pkgRepo.findById(packageId)).thenReturn(Optional.of(existingEntity));
+
+        // When & Then
+        assertThatThrownBy(() -> service.updatePackage(packageId, updateRequest))
+                .isInstanceOf(APIException.class)
+                .hasMessage("Status must be an initial state (e.g. PENDING)");
+
+        verify(pkgRepo).findById(packageId);
+        verify(pkgRepo, never()).save(any());
+        verifyNoInteractions(pkgMapper);
+    }
+
+    @Test
+    void updatePackage_inTransitPackage_success() {
+        // Given
+        Long packageId = 1L;
+        PackageRequestDTO updateRequest = new PackageRequestDTO(
+                "Updated Description", 20.0, true, PackageStatus.PENDING
+        );
+
+        PackageEntity existingEntity = new PackageEntity();
+        existingEntity.setPackageId(packageId);
+        existingEntity.setDescription("Original Description");
+        existingEntity.setWeight(15.0);
+        existingEntity.setFragile(false);
+        existingEntity.setStatus(PackageStatus.IN_TRANSIT); // Can be updated
+
+        PackageEntity updatedEntity = new PackageEntity();
+        updatedEntity.setPackageId(packageId);
+        updatedEntity.setDescription("Updated Description");
+        updatedEntity.setWeight(20.0);
+        updatedEntity.setFragile(true);
+        updatedEntity.setStatus(PackageStatus.PENDING);
+
+        PackageResponseDTO expectedResponse = new PackageResponseDTO(
+                packageId, "Updated Description", 20.0, true, PackageStatus.PENDING
+        );
+
+        when(pkgRepo.findById(packageId)).thenReturn(Optional.of(existingEntity));
+        when(pkgRepo.save(existingEntity)).thenReturn(updatedEntity);
+        when(pkgMapper.toResponseDto(updatedEntity)).thenReturn(expectedResponse);
+
+        // When
+        PackageResponseDTO result = service.updatePackage(packageId, updateRequest);
+
+        // Then
+        assertThat(result).isNotNull();
+        assertThat(result.description()).isEqualTo("Updated Description");
+        assertThat(result.weight()).isEqualTo(20.0);
+        assertThat(result.fragile()).isTrue();
+        assertThat(result.status()).isEqualTo(PackageStatus.PENDING);
+
+        verify(pkgRepo).findById(packageId);
+        verify(pkgRepo).save(existingEntity);
+        verify(pkgMapper).toResponseDto(updatedEntity);
+    }
+
+    @Test
+    void updatePackage_repositoryThrowsException_propagatesException() {
+        // Given
+        Long packageId = 1L;
+        PackageRequestDTO updateRequest = new PackageRequestDTO(
+                "Updated Description", 20.0, false, PackageStatus.PENDING
+        );
+
+        RuntimeException repositoryException = new RuntimeException("Database connection error");
+        when(pkgRepo.findById(packageId)).thenThrow(repositoryException);
+
+        // When & Then
+        assertThatThrownBy(() -> service.updatePackage(packageId, updateRequest))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessage("Database connection error");
+
+        verify(pkgRepo).findById(packageId);
+        verify(pkgRepo, never()).save(any());
+        verifyNoInteractions(pkgMapper);
+    }
+
+    @Test
+    void updatePackage_saveThrowsException_propagatesException() {
+        // Given
+        Long packageId = 1L;
+        PackageRequestDTO updateRequest = new PackageRequestDTO(
+                "Updated Description", 20.0, false, PackageStatus.PENDING
+        );
+
+        PackageEntity existingEntity = new PackageEntity();
+        existingEntity.setPackageId(packageId);
+        existingEntity.setDescription("Original Description");
+        existingEntity.setWeight(15.0);
+        existingEntity.setFragile(false);
+        existingEntity.setStatus(PackageStatus.PENDING);
+
+        RuntimeException saveException = new RuntimeException("Save operation failed");
+        when(pkgRepo.findById(packageId)).thenReturn(Optional.of(existingEntity));
+        when(pkgRepo.save(existingEntity)).thenThrow(saveException);
+
+        // When & Then
+        assertThatThrownBy(() -> service.updatePackage(packageId, updateRequest))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessage("Save operation failed");
+
+        verify(pkgRepo).findById(packageId);
+        verify(pkgRepo).save(existingEntity);
+        verifyNoInteractions(pkgMapper);
+    }
+
     private List<PackageEntity> createTestEntities() {
         PackageEntity entity1 = new PackageEntity();
         entity1.setPackageId(1L);
